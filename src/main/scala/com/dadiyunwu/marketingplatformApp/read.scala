@@ -1,4 +1,4 @@
-package com.dadiyunwu.marketingplatform
+package com.dadiyunwu.marketingplatformApp
 
 import com.dadiyunwu.util.{ColumnHelper, CommHelper, SparkHelper}
 import org.apache.spark.sql.{Row, RowFactory}
@@ -16,11 +16,11 @@ object read {
     val conf = SparkHelper.getSparkConf("read")
     val spark = SparkHelper.getSparkSession(conf)
 
-    val path = CommHelper.getFilePath(url)
+    val path = CommHelper.getFilePath(read.getClass, url)
     val df = spark.read.parquet(path)
 
-    val industryMap = CommHelper.readFile2Map4String("industry.txt")
-    val regionMap = CommHelper.readFile2Map4String("region.txt")
+    val industryMap = CommHelper.readFile2Map4String(read.getClass, "industry.txt")
+    val regionMap = CommHelper.readFile2Map4String(read.getClass, "region.txt")
 
 
     val resultSchema = ColumnHelper.getResultSchema()

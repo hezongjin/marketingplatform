@@ -5,14 +5,14 @@ import scala.io.Source
 
 object CommHelper {
 
-  def getFilePath(fileName: String): String = {
+  def getFilePath(cls: Class[_], fileName: String): String = {
 
-    val path = CommHelper.getClass.getClassLoader.getResource(fileName).getPath
+    val path = cls.getClassLoader.getResource(fileName).getPath
     path
   }
 
-  def readFile2Map4String(file: String): mutable.HashMap[String, String] = {
-    val path = CommHelper.getFilePath(file)
+  def readFile2Map4String(cls: Class[_], file: String): mutable.HashMap[String, String] = {
+    val path = CommHelper.getFilePath(cls, file)
     val lines = Source.fromFile(path).getLines()
 
     val map = new mutable.HashMap[String, String]()

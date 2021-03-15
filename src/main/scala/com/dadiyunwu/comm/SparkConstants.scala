@@ -3,8 +3,8 @@ package com.dadiyunwu.comm
 object SparkConstants {
 
   //================================spark参数=====================================
-  //  val master = "yarn"
-  val master = "local[2]"
+  val master = "yarn"
+  //  val master = "local[*]"
   val name = "Marketing"
   val leftType = "left"
 

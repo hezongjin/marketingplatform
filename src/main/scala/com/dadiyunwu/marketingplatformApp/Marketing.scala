@@ -1,4 +1,6 @@
-package com.dadiyunwu.marketingplatform
+package com.dadiyunwu.marketingplatformApp
+
+import java.time.LocalDate
 
 import com.dadiyunwu.comm.SparkConstants
 import com.dadiyunwu.util.{ColumnHelper, CommHelper, SparkHelper}
@@ -19,14 +21,14 @@ object Marketing {
     //      .set("spark.sql.warehouse.dir", "spark-warehouse")
     val spark = SparkHelper.getSparkSession(conf)
 
-    val industryMap = CommHelper.readFile2Map4String("industry.txt")
-    val regionMap = CommHelper.readFile2Map4String("region.txt")
+    val cls: Class[_] = Marketing.getClass
+    val industryMap = CommHelper.readFile2Map4String(cls, "industry.txt")
+    val regionMap = CommHelper.readFile2Map4String(cls, "region.txt")
 
-    val sourceDF = spark.read.parquet("/ori/labelinfo1")
+    val sourceDF = spark.read.parquet("/ori/marketing")
       .where(col(ent_id).isNotNull)
-      //      .selectExpr("ent_id", "cust_id", "createDate", "custNameCn")
+      .selectExpr("entId as ent_id", "custId as cust_id", "createDate", "custNameCn")
       .selectExpr(ent_id)
-      .repartition(100)
 
     val entId = ColumnHelper.getEntID()
 
@@ -68,8 +70,8 @@ object Marketing {
       .join(netPopuDF, sourceDF(ent_id) === netPopuDF(ent_id), SparkConstants.leftType)
       .join(subDF, sourceDF(ent_id) === subDF(ent_id), SparkConstants.leftType)
       .select(
-        sourceDF(ent_id),
-        when(treadMarkDF(ent_id).isNotNull, 1).otherwise(2) alias ("t1"),
+        sourceDF("*"),
+        when(treadMarkDF(ent_id).isNotNull, 1).otherwise(2).alias("t1"),
         when(patentDF(ent_id).isNotNull, 1).otherwise(2).alias("t2"),
         when(alterationsDF(ent_id).isNotNull, 1).otherwise(2).alias("t3"),
         when(netPopuDF(ent_id).isNotNull, 1).otherwise(2).alias("t4"),
@@ -101,6 +103,9 @@ object Marketing {
       val arr = new ArrayBuffer[Row]()
       iter.foreach(row => {
         val ent_id: String = row.getAs[String]("ent_id")
+        val cust_id: String = row.getAs[String]("cust_id")
+        val createDate: String = row.getAs[String]("createDate")
+        val custNameCn: String = row.getAs[String]("custNameCn")
         val t1: AnyRef = row.getAs[Nothing]("t1")
         val t2: AnyRef = row.getAs[Nothing]("t2")
         val t3: AnyRef = row.getAs[Nothing]("t3")
@@ -121,14 +126,22 @@ object Marketing {
         val city = regionMap.getOrElse(city_code, "")
         val county = regionMap.getOrElse(county_code, "")
 
-        arr += RowFactory.create(ent_id, t1, t2, t3, t4, t5, t6, reg_caps2,
+        arr += RowFactory.create(ent_id, cust_id, createDate, custNameCn, t1, t2, t3, t4, t5, t6, reg_caps2,
           estimate_date, cnei, cnei_sec, province, city, county
         )
       })
       arr.iterator
     })(resultEncoder)
 
-    resultData.show()
+    resultData.repartition(1).write.parquet("/ori/result")
+    /* resultData.persist()
 
+     val today = LocalDate.now().toString
+     resultData
+       .select("cust_id,createDate as TAG_VALUE")
+       .withColumn("DATA_DATE", lit(today))
+       .withColumn("", lit("建档时间"))
+
+     resultData.unpersist()*/
   }
 }

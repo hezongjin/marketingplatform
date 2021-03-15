@@ -1,4 +1,4 @@
-package com.dadiyunwu.marketingplatform
+package com.dadiyunwu.marketingplatformApp
 
 import com.dadiyunwu.comm.SparkConstants
 import com.dadiyunwu.util.{ColumnHelper, SparkHelper}

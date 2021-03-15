@@ -49,9 +49,14 @@ object ColumnHelper {
     columns
   }
 
+
+
   def getResultSchema(): StructType = {
     val schea = StructType(Seq(
       StructField("ent_id", StringType),
+      StructField("cust_id", StringType),
+      StructField("createDate", StringType),
+      StructField("custNameCn", StringType),
       StructField("t1", IntegerType),
       StructField("t2", IntegerType),
       StructField("t3", IntegerType),

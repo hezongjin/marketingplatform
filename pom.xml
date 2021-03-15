@@ -34,17 +34,19 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <dependency>
-            <groupId>org.apache.phoenix</groupId>
-            <artifactId>phoenix-spark</artifactId>
-            <version>4.10.0-HBase-1.2</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
+
+          <dependency>
+              <groupId>org.apache.phoenix</groupId>
+              <artifactId>phoenix-spark</artifactId>
+              <version>4.10.0-HBase-1.2</version>
+              <exclusions>
+                  <exclusion>
+                      <groupId>org.apache.hadoop</groupId>
+                      <artifactId>*</artifactId>
+                  </exclusion>
+              </exclusions>
+          </dependency>
+
         <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch-spark-20_2.11</artifactId>
@@ -54,7 +56,13 @@
         <dependency>
             <groupId>ru.yandex.clickhouse</groupId>
             <artifactId>clickhouse-jdbc</artifactId>
-            <version>0.2.4</version>
+            <version>0.2.2</version>
+        </dependency>
+        <!--guava-->
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>28.0-jre</version>
         </dependency>
         <!--Jedis依赖-->
         <dependency>
@@ -179,8 +187,8 @@
                 </executions>
                 <configuration>
                     <scalaVersion>2.11.8</scalaVersion>
-                    <recompileMode>incrtrueemental</recompileMode>
-                    <useZincServer></useZincServer>
+                    <recompileMode>incremental</recompileMode>
+                    <useZincServer>true</useZincServer>
                     <args>
                         <arg>-unchecked</arg>
                         <arg>-deprecation</arg>

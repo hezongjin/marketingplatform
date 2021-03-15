@@ -30,7 +30,7 @@ object test {
       }
 
 
-    val industryMap = CommHelper.readFile2Map4String("industry.txt")
+    val industryMap = CommHelper.readFile2Map4String(test.getClass, "industry.txt")
     //    println(industryMap.mkString(","))
 
     println(Byte.MaxValue)

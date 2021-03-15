@@ -66,8 +66,8 @@
         </executions>
         <configuration>
           <scalaVersion>2.11.8</scalaVersion>
-          <recompileMode>incrtrueemental</recompileMode>
-          <useZincServer />
+          <recompileMode>incremental</recompileMode>
+          <useZincServer>true</useZincServer>
           <args>
             <arg>-unchecked</arg>
             <arg>-deprecation</arg>
