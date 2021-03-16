@@ -1,11 +1,13 @@
 package com.dadiyunwu.util
 
 import java.sql.{Connection, DriverManager}
+import java.time.LocalDate
 import java.util.Properties
 
 import com.dadiyunwu.comm.SparkConstants
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.JdbcRDD
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
 import scala.io.Source
@@ -121,14 +123,59 @@ object SparkHelper {
       println(df2.count())*/
 
 
-   /* val strings = Source.fromFile(CommHelper.getFilePath(SparkHelper.getClass, "industry.txt")).getLines()
-    for (elem <- strings) {
-      println(elem)
-    }*/
+    /* val strings = Source.fromFile(CommHelper.getFilePath(SparkHelper.getClass, "industry.txt")).getLines()
+     for (elem <- strings) {
+       println(elem)
+     }*/
 
-    for (elem <- Source.fromFile(SparkHelper.getClass.getResource("industry.txt").getPath).getLines()) {
-      println(elem)
+    /*
+        println("*" * 16)
+        println("=" * 16)
+
+        val loader = SparkHelper.getClass.getClassLoader
+        println(loader)
+
+        val path = SparkHelper.getClass.getClassLoader.getResource("industry.txt")
+        println(path)
+
+        for (elem <- Source.fromFile(path.getPath).getLines()) {
+          println(elem)
+        }*/
+
+    val conf = SparkHelper.getSparkConf("test")
+    val spark = SparkHelper.getSparkSession(conf)
+
+
+    val resultData = spark.read.parquet("E:\\learn\\marketingplatform\\src\\main\\resources\\part-00000-e7cb5da6-70e1-4d71-be61-27e46af06bc4-c000.snappy.parquet")
+
+    val prop = new Properties()
+    prop.put("driver", classOf[ru.yandex.clickhouse.ClickHouseDriver].getName)
+    prop.put("user", "default")
+    prop.put("password", "c6hP16Fd")
+    val url = "jdbc:clickhouse://10.112.1.15:8123/ODS_LOCAL?useUnicode=true&characterEncoding=UTF-8"
+
+    resultData.persist()
+    val today = LocalDate.now().toString
+
+    for (elem <- SparkConstants.TAG_CODE_MAP) {
+      val key = elem._1
+      val value = elem._2
+      resultData
+        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"))
+        .withColumn("DATA_DATE", lit(today))
+        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP(key)))
+        .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
+        .write
+        .mode(SaveMode.Append)
+        .jdbc(url, "DW.DW_CE17_TAG_CUST_BASE", prop)
+
+      println("=" * 32)
     }
+
+    resultData.unpersist()
+
+    spark.sparkContext.stop()
+    spark.stop()
 
   }
 

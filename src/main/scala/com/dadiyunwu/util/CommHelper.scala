@@ -1,5 +1,7 @@
 package com.dadiyunwu.util
 
+import org.apache.spark.sql.SparkSession
+
 import scala.collection.mutable
 import scala.io.Source
 
@@ -17,6 +19,17 @@ object CommHelper {
 
     val map = new mutable.HashMap[String, String]()
     lines.foreach(elem => {
+      val arr = elem.split(",")
+      map.put(arr(0), arr(1))
+    })
+    map
+  }
+
+  def readFile2Map4StringFromSpark(spark: SparkSession, fileName: String): mutable.HashMap[String, String] = {
+    val map = new mutable.HashMap[String, String]()
+
+    val strs: Array[String] = spark.sparkContext.textFile(s"hdfs://bdpcluster/ori/map/${fileName}").collect()
+    strs.foreach(elem => {
       val arr = elem.split(",")
       map.put(arr(0), arr(1))
     })

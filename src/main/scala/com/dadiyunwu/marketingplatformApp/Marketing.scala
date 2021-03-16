@@ -6,7 +6,7 @@ import com.dadiyunwu.comm.SparkConstants
 import com.dadiyunwu.util.{ColumnHelper, CommHelper, SparkHelper}
 import org.apache.spark.sql.functions._
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.{Row, RowFactory}
+import org.apache.spark.sql.{Row, RowFactory, SaveMode}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 import scala.collection.mutable.ArrayBuffer
@@ -21,14 +21,13 @@ object Marketing {
     //      .set("spark.sql.warehouse.dir", "spark-warehouse")
     val spark = SparkHelper.getSparkSession(conf)
 
-    val cls: Class[_] = Marketing.getClass
-    val industryMap = CommHelper.readFile2Map4String(cls, "industry.txt")
-    val regionMap = CommHelper.readFile2Map4String(cls, "region.txt")
+    val industryMap = CommHelper.readFile2Map4StringFromSpark(spark, "industry.txt")
+    val regionMap = CommHelper.readFile2Map4StringFromSpark(spark, "region.txt")
 
     val sourceDF = spark.read.parquet("/ori/marketing")
-      .where(col(ent_id).isNotNull)
+      .where(col("entId").isNotNull)
       .selectExpr("entId as ent_id", "custId as cust_id", "createDate", "custNameCn")
-      .selectExpr(ent_id)
+      .repartition(20)
 
     val entId = ColumnHelper.getEntID()
 
@@ -134,14 +133,31 @@ object Marketing {
     })(resultEncoder)
 
     resultData.repartition(1).write.parquet("/ori/result")
-    /* resultData.persist()
+    resultData.persist()
 
-     val today = LocalDate.now().toString
-     resultData
-       .select("cust_id,createDate as TAG_VALUE")
-       .withColumn("DATA_DATE", lit(today))
-       .withColumn("", lit("建档时间"))
+    val today = LocalDate.now().toString
 
-     resultData.unpersist()*/
+    val prop = SparkConstants.CLICKHOUSE_PROP
+    val url = SparkConstants.CLICKHOUSE_URL()
+    val table = SparkConstants.DATA_TABLE
+
+    for (elem <- SparkConstants.TAG_CODE_MAP) {
+      val key = elem._1
+      val value = elem._2
+      resultData
+        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"))
+        .withColumn("DATA_DATE", lit(today))
+        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP(key)))
+        .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
+        .write
+        .mode(SaveMode.Append)
+        .jdbc(url, table, prop)
+
+      println("=" * 32)
+    }
+    resultData.unpersist()
+
+    spark.sparkContext.stop()
+    spark.stop()
   }
 }
