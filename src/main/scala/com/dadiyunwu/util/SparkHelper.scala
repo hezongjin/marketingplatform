@@ -7,9 +7,10 @@ import java.util.Properties
 import com.dadiyunwu.comm.SparkConstants
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.JdbcRDD
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.{col, lit, when}
 import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 
+import scala.collection.mutable
 import scala.io.Source
 
 object SparkHelper {
@@ -30,15 +31,50 @@ object SparkHelper {
     conf
   }
 
+
   def getSparkSession(conf: SparkConf): SparkSession = {
     val spark = SparkSession.builder().config(conf).getOrCreate()
+
+    registerUDF(spark)
 
     spark.sparkContext.setLogLevel("WARN")
     spark
   }
 
-  def getSparkSessionWithHive(conf: SparkConf): SparkSession = {
+  def getSparkSessionWithHive(conf: SparkConf): Unit = {
     val spark = SparkSession.builder().config(conf).enableHiveSupport().getOrCreate()
+    spark
+  }
+
+
+  def registerUDF(spark: SparkSession): SparkSession = {
+
+    val industryMap = CommHelper.readFile2Map4StringFromSpark(spark, "industry.txt")
+    val regionMap = CommHelper.readFile2Map4StringFromSpark(spark, "region.txt")
+
+    val getIndus = (key: String) => {
+      var indus: String = ""
+      try {
+        indus = industryMap(key)
+      } catch {
+        case ex: Exception => {}
+      }
+      indus
+    }
+
+    val getRegion = (key: String) => {
+      var region: String = ""
+      try {
+        region = regionMap(key)
+      } catch {
+        case e: Exception => {}
+      }
+      region
+    }
+
+    spark.udf.register("getIndus", getIndus)
+    spark.udf.register("getRegion", getRegion)
+
     spark
   }
 
@@ -55,6 +91,16 @@ object SparkHelper {
   def getTableFromParquet(spark: SparkSession, table: String): DataFrame = {
     val df = spark.read.parquet(s"/ori/${table}")
     df
+  }
+
+  def getFilePath(fileName: String): String = {
+    var path: String = null
+    if (SparkConstants.tag.equals("prod")) {
+      path = s"hdfs://bdpcluster/ori/map/${fileName}"
+    } else {
+      path = SparkHelper.getClass.getClassLoader.getResource(fileName).getPath
+    }
+    path
   }
 
   def readDataFromCK(spark: SparkSession, table: String): Unit = {
@@ -96,86 +142,10 @@ object SparkHelper {
 
   }
 
+  //HashMap[String, String]
 
   def main(args: Array[String]): Unit = {
 
-    /*  val conf = SparkHelper.getSparkConf("test")
-      val spark = SparkHelper.getSparkSession(conf)
-
-      val path = this.getClass.getClassLoader.getResource("part-00000-e004cf6b-c21f-44aa-89aa-13a3c08541f6-c000.snappy.parquet").getPath
-
-      val prop = new Properties()
-      prop.put("driver", classOf[ru.yandex.clickhouse.ClickHouseDriver].getName)
-      prop.put("user", "default")
-      prop.put("password", "c6hP16Fd")
-
-      import org.apache.spark.sql.functions._
-
-      val url = "jdbc:clickhouse://10.112.1.15:8123/ODS_LOCAL?useUnicode=true&characterEncoding=UTF-8"
-
-      val df = spark.read.parquet(path)
-
-      df.createOrReplaceTempView("tmp")
-
-      val df2 = spark.read.parquet("E:\\learn\\marketingplatform\\data\\data.snappy.parquet")
-
-
-      println(df2.count())*/
-
-
-    /* val strings = Source.fromFile(CommHelper.getFilePath(SparkHelper.getClass, "industry.txt")).getLines()
-     for (elem <- strings) {
-       println(elem)
-     }*/
-
-    /*
-        println("*" * 16)
-        println("=" * 16)
-
-        val loader = SparkHelper.getClass.getClassLoader
-        println(loader)
-
-        val path = SparkHelper.getClass.getClassLoader.getResource("industry.txt")
-        println(path)
-
-        for (elem <- Source.fromFile(path.getPath).getLines()) {
-          println(elem)
-        }*/
-
-    val conf = SparkHelper.getSparkConf("test")
-    val spark = SparkHelper.getSparkSession(conf)
-
-
-    val resultData = spark.read.parquet("E:\\learn\\marketingplatform\\src\\main\\resources\\part-00000-e7cb5da6-70e1-4d71-be61-27e46af06bc4-c000.snappy.parquet")
-
-    val prop = new Properties()
-    prop.put("driver", classOf[ru.yandex.clickhouse.ClickHouseDriver].getName)
-    prop.put("user", "default")
-    prop.put("password", "c6hP16Fd")
-    val url = "jdbc:clickhouse://10.112.1.15:8123/ODS_LOCAL?useUnicode=true&characterEncoding=UTF-8"
-
-    resultData.persist()
-    val today = LocalDate.now().toString
-
-    for (elem <- SparkConstants.TAG_CODE_MAP) {
-      val key = elem._1
-      val value = elem._2
-      resultData
-        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"))
-        .withColumn("DATA_DATE", lit(today))
-        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP(key)))
-        .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
-        .write
-        .mode(SaveMode.Append)
-        .jdbc(url, "DW.DW_CE17_TAG_CUST_BASE", prop)
-
-      println("=" * 32)
-    }
-
-    resultData.unpersist()
-
-    spark.sparkContext.stop()
-    spark.stop()
 
   }
 

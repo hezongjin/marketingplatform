@@ -28,7 +28,8 @@ object CommHelper {
   def readFile2Map4StringFromSpark(spark: SparkSession, fileName: String): mutable.HashMap[String, String] = {
     val map = new mutable.HashMap[String, String]()
 
-    val strs: Array[String] = spark.sparkContext.textFile(s"hdfs://bdpcluster/ori/map/${fileName}").collect()
+    val path = SparkHelper.getFilePath(fileName)
+    val strs: Array[String] = spark.sparkContext.textFile(path).collect()
     strs.foreach(elem => {
       val arr = elem.split(",")
       map.put(arr(0), arr(1))

@@ -6,11 +6,15 @@ import scala.util.Random
 
 object SparkConstants {
 
-  val tag = "test"
+  val tag = "prod"
 
   //================================spark参数=====================================
   //  val master = "yarn"
-  val master = "local[*]"
+  val master = if (tag.equals("test")) {
+    "local[*]"
+  } else {
+    "yarn"
+  }
   val name = "Marketing"
   val leftType = "left"
 
@@ -32,23 +36,54 @@ object SparkConstants {
 
   //================================Map==========================================
 
-  val TAG_VALUE_NAME_MAP = Map(
-    "createDate" -> "建档时间",
-    "custNameCn" -> "客户名称",
+  /**
+    * "createDate" -> "建档时间",
+    * "custNameCn" -> "客户名称",
+    * "t1" -> "是否有商标(1有 2无)",
+    * "t2" -> "是否有专利(1有 2无)",
+    * "t3" -> "营业执照是否有变更(1是 2否)",
+    * "t4" -> "是否有百度竞价推广(1有 2无)",
+    * "t5" -> "是否有公众号(1有 2无)",
+    * "t6" -> "是否含进出口(1有 2无)",
+    * "reg_caps2" -> "注册资金(万人民币)",
+    * "estimate_date" -> "成立日期",
+    * "cnei" -> "所属行业-一级",
+    * "cnei_sec" -> "所属行业-二级",
+    * "province" -> "注册地址-省",
+    * "city" -> "注册地址-市",
+    * "county" -> "注册地址-区"
+    */
+  val TAG_VALUE_NAME_MAP1 = Map(
     "t1" -> "是否有商标(1有 2无)",
     "t2" -> "是否有专利(1有 2无)",
-    "t3" -> "营业执照是否有变更(1是 2否)",
+    //    "t3" -> "营业执照是否有变更(1是 2否)",
     "t4" -> "是否有百度竞价推广(1有 2无)",
     "t5" -> "是否有公众号(1有 2无)",
-    "t6" -> "是否含进出口(1有 2无)",
-    "reg_caps2" -> "注册资金(万人民币)",
-    "estimate_date" -> "成立日期",
-    "cnei" -> "所属行业-一级",
-    "cnei_sec" -> "所属行业-二级",
-    "province" -> "注册地址-省",
-    "city" -> "注册地址-市",
-    "county" -> "注册地址-区"
+    "t6" -> "是否含进出口(1有 2无)"
   )
+
+  val TAG_VALUE_NAME_MAP2 = Map(
+    "t3" -> "营业执照是否有变更(1是 2否)"
+  )
+
+  val TAG_VALUE_NAME_MAP3 = Map(
+    "cnei_code" -> "所属行业-一级",
+    "cnei_sec_code" -> "所属行业-二级"
+  )
+
+  val TAG_VALUE_NAME_MAP4 = Map(
+    "province_code" -> "注册地址-省",
+    "city_code" -> "注册地址-市",
+    "county_code" -> "注册地址-区"
+  )
+
+  val TAG_VALUE_NAME_MAP5 = Map(
+    "createDate" -> "建档时间",
+    "custNameCn" -> "客户名称",
+    "reg_caps2" -> "注册资金(万人民币)",
+    "estimate_date" -> "成立日期"
+  )
+
 
   val TAG_CODE_MAP = Map(
     "createDate" -> "CRE_DATE",
@@ -61,11 +96,11 @@ object SparkConstants {
     "t6" -> "IS_IO",
     "reg_caps2" -> "REG_CAPS",
     "estimate_date" -> "ESTIMATE_DATE",
-    "cnei" -> "CNEI_CODE",
-    "cnei_sec" -> "CNEI_SEC_CODE",
-    "province" -> "PROVINCE",
-    "city" -> "CITY",
-    "county" -> "COUNTY"
+    "cnei_code" -> "CNEI_CODE",
+    "cnei_sec_code" -> "CNEI_SEC_CODE",
+    "province_code" -> "PROVINCE",
+    "city_code" -> "CITY",
+    "county_code" -> "COUNTY"
   )
 
   //======================================clickhouse===============================================
@@ -113,6 +148,9 @@ object SparkConstants {
   }
 
   val DATA_TABLE = "DW.DW_CE17_TAG_CUST_BASE"
+
+  //======================================file=====================================================
+
 
   def main(args: Array[String]): Unit = {
 

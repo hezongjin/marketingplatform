@@ -9,6 +9,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.{Row, RowFactory, SaveMode}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 object Marketing {
@@ -21,8 +22,6 @@ object Marketing {
     //      .set("spark.sql.warehouse.dir", "spark-warehouse")
     val spark = SparkHelper.getSparkSession(conf)
 
-    val industryMap = CommHelper.readFile2Map4StringFromSpark(spark, "industry.txt")
-    val regionMap = CommHelper.readFile2Map4StringFromSpark(spark, "region.txt")
 
     val sourceDF = spark.read.parquet("/ori/marketing")
       .where(col("entId").isNotNull)
@@ -94,11 +93,13 @@ object Marketing {
     val baseInfoJoinColumns = ColumnHelper.getBaseInfoJoinColumns(labelWithCapitalDF)
     val resultDF = labelWithCapitalDF.join(baseInfoDF, Seq(ent_id), SparkConstants.leftType)
       .select(baseInfoJoinColumns: _*)
+      .coalesce(20)
 
-    val resultSchema = ColumnHelper.getResultSchema()
-    val resultEncoder = RowEncoder(resultSchema)
 
-    val resultData = resultDF.mapPartitions(iter => {
+    /*val resultSchema = ColumnHelper.getResultSchema()
+    val resultEncoder = RowEncoder(resultSchema)*/
+
+    /*val resultData = resultDF.mapPartitions(iter => {
       val arr = new ArrayBuffer[Row]()
       iter.foreach(row => {
         val ent_id: String = row.getAs[String]("ent_id")
@@ -130,24 +131,24 @@ object Marketing {
         )
       })
       arr.iterator
-    })(resultEncoder)
+    })(resultEncoder)*/
 
-    resultData.repartition(1).write.parquet("/ori/result")
-    resultData.persist()
+    resultDF.persist()
 
     val today = LocalDate.now().toString
-
     val prop = SparkConstants.CLICKHOUSE_PROP
     val url = SparkConstants.CLICKHOUSE_URL()
     val table = SparkConstants.DATA_TABLE
 
-    for (elem <- SparkConstants.TAG_CODE_MAP) {
+    for (elem <- SparkConstants.TAG_VALUE_NAME_MAP1) {
       val key = elem._1
       val value = elem._2
-      resultData
-        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"))
+      resultDF
+        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"),
+          when(col(key).equalTo(1), "有").otherwise("无").alias("TAG_VALUE_NAME")
+        )
         .withColumn("DATA_DATE", lit(today))
-        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP(key)))
+        //        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP1(key)))
         .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
         .write
         .mode(SaveMode.Append)
@@ -155,9 +156,70 @@ object Marketing {
 
       println("=" * 32)
     }
-    resultData.unpersist()
+
+    for (elem <- SparkConstants.TAG_VALUE_NAME_MAP2) {
+      val key = elem._1
+      val value = elem._2
+      resultDF
+        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"),
+          when(col(key).equalTo(1), "是").otherwise("否").alias("TAG_VALUE_NAME")
+        )
+        .withColumn("DATA_DATE", lit(today))
+        //        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP1(key)))
+        .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
+        .write
+        .mode(SaveMode.Append)
+        .jdbc(url, table, prop)
+
+      println("=" * 32)
+    }
+
+    for (elem <- SparkConstants.TAG_VALUE_NAME_MAP3) {
+      val key = elem._1
+      val value = elem._2
+      resultDF
+        //        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"))
+        .selectExpr("cust_id as CUST_ID", s"${key} as TAG_VALUE", s"getIndus(${key}) as TAG_VALUE_NAME")
+        .withColumn("DATA_DATE", lit(today))
+        .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
+        .write
+        .mode(SaveMode.Append)
+        .jdbc(url, table, prop)
+    }
+
+    for (elem <- SparkConstants.TAG_VALUE_NAME_MAP4) {
+      val key = elem._1
+      val value = elem._2
+      resultDF
+        //        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"))
+        .selectExpr("cust_id as CUST_ID", s"${key} as TAG_VALUE", s"getRegion(${key}) as TAG_VALUE_NAME")
+        .withColumn("DATA_DATE", lit(today))
+        .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
+        .write
+        .mode(SaveMode.Append)
+        .jdbc(url, table, prop)
+
+    }
+
+    for (elem <- SparkConstants.TAG_VALUE_NAME_MAP5) {
+      val key = elem._1
+      val value = elem._2
+      resultDF
+        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE_NAME"))
+        .withColumn("DATA_DATE", lit(today))
+        .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
+        .write
+        .mode(SaveMode.Append)
+        .jdbc(url, table, prop)
+
+      println("=" * 32)
+    }
+
+
+    resultDF.unpersist()
 
     spark.sparkContext.stop()
     spark.stop()
   }
+
 }
