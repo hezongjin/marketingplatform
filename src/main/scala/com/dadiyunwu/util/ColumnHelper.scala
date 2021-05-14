@@ -6,6 +6,9 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
+/**
+  * 获取列
+  */
 object ColumnHelper {
 
   def getEntID(): ArrayBuffer[String] = {
@@ -23,15 +26,7 @@ object ColumnHelper {
     columns.+=(col("province_code"))
     columns.+=(col("city_code"))
     columns.+=(col("county_code"))
-    columns.+=(
-      when(
-        instr(col("oper_scope"), "外贸") >= 0
-          or instr(col("oper_scope"), "国际贸易") >= 0
-          or instr(col("oper_scope"), "进出口") >= 0
-          or instr(col("oper_scope"), "对外贸易") >= 0
-          or instr(col("oper_scope"), "货运代理") >= 0
-          or instr(col("oper_scope"), "国际货运") >= 0
-        , 1).otherwise(2).alias("t6"))
+    columns.+=(when(instr(col("oper_scope"), "进出口") > 0, 1).otherwise(0).alias("t6"))
     columns
   }
 
@@ -50,7 +45,11 @@ object ColumnHelper {
   }
 
 
-
+  /**
+    * schema
+    *
+    * @return
+    */
   def getResultSchema(): StructType = {
     val schea = StructType(Seq(
       StructField("ent_id", StringType),
@@ -72,6 +71,16 @@ object ColumnHelper {
       StructField("county", StringType)
     ))
     schea
+  }
+
+
+  def getJoinResult(sourceDF: DataFrame): ArrayBuffer[Column] = {
+    val columns = new ArrayBuffer[Column]()
+    columns += sourceDF("custId as cust_id")
+    columns += sourceDF("createDate")
+    columns += sourceDF("custNameCn")
+
+    columns
   }
 
 }

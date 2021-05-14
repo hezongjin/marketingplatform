@@ -4,14 +4,19 @@ import java.util.Properties
 
 import scala.util.Random
 
+/**
+  * 常量类
+  */
 object SparkConstants {
 
+  //环境标识 prod生产 test测试 dev开发
   val tag = "prod"
 
   //================================spark参数=====================================
   //  val master = "yarn"
   val master = if (tag.equals("test")) {
     "local[*]"
+    //    "yarn"
   } else {
     "yarn"
   }
@@ -98,9 +103,9 @@ object SparkConstants {
     "estimate_date" -> "ESTIMATE_DATE",
     "cnei_code" -> "CNEI_CODE",
     "cnei_sec_code" -> "CNEI_SEC_CODE",
-    "province_code" -> "PROVINCE",
-    "city_code" -> "CITY",
-    "county_code" -> "COUNTY"
+    "province_code" -> "MAILING_ADDR_PROVINCE",
+    "city_code" -> "MAILING_ADDR_CITY",
+    "county_code" -> "MAILING_ADDR_ZONE"
   )
 
   //======================================clickhouse===============================================
@@ -147,7 +152,8 @@ object SparkConstants {
     url
   }
 
-  val DATA_TABLE = "DW.DW_CE17_TAG_CUST_BASE"
+  //  val DATA_TABLE = "DW.DW_CE17_TAG_CUST_BASE"
+  val DATA_TABLE = "ODS_CE17.ce17_hbase_tag_cust_base"
 
   //======================================file=====================================================
 

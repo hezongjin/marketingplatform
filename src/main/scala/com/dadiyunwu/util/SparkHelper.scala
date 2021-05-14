@@ -13,7 +13,11 @@ import org.apache.spark.sql.{DataFrame, SaveMode, SparkSession}
 import scala.collection.mutable
 import scala.io.Source
 
+/**
+  * spark 工具类
+  */
 object SparkHelper {
+
 
   def getSparkConf(name: String): SparkConf = {
     val conf = new SparkConf()
@@ -31,7 +35,6 @@ object SparkHelper {
     conf
   }
 
-
   def getSparkSession(conf: SparkConf): SparkSession = {
     val spark = SparkSession.builder().config(conf).getOrCreate()
 
@@ -46,7 +49,12 @@ object SparkHelper {
     spark
   }
 
-
+  /**
+    * 注册UDF
+    *
+    * @param spark
+    * @return
+    */
   def registerUDF(spark: SparkSession): SparkSession = {
 
     val industryMap = CommHelper.readFile2Map4StringFromSpark(spark, "industry.txt")
@@ -55,7 +63,17 @@ object SparkHelper {
     val getIndus = (key: String) => {
       var indus: String = ""
       try {
-        indus = industryMap(key)
+        //\u0002 hbase的分隔符
+        val keys = key.split("\u0002")
+        for (elem <- keys) {
+          val value = industryMap(elem)
+          if (value != null && (!value.equals(""))) {
+            indus += industryMap(elem) + ","
+          }
+        }
+
+        indus = indus.substring(0, indus.size - 1)
+
       } catch {
         case ex: Exception => {}
       }
@@ -78,6 +96,13 @@ object SparkHelper {
     spark
   }
 
+  /**
+    * 读取phoenix中的表
+    *
+    * @param spark
+    * @param table
+    * @return
+    */
   def getTableFromHbase(spark: SparkSession, table: String): DataFrame = {
     spark.read.format(SparkConstants.phoenix)
       .option(SparkConstants.table, table)
@@ -142,11 +167,17 @@ object SparkHelper {
 
   }
 
-  //HashMap[String, String]
+  /**
+    * 获取维表 -> 要计算的17万数据 (后续会增加)
+    *
+    * @param sparkSession
+    * @return
+    */
+  //todo 获取维表 读取clickhouse 获取
+  def getDIMTable(sparkSession: SparkSession): DataFrame = {
 
-  def main(args: Array[String]): Unit = {
-
-
+    null
   }
+
 
 }

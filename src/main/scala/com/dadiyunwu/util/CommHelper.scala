@@ -5,6 +5,9 @@ import org.apache.spark.sql.SparkSession
 import scala.collection.mutable
 import scala.io.Source
 
+/**
+  * 通用工具类
+  */
 object CommHelper {
 
   def getFilePath(cls: Class[_], fileName: String): String = {

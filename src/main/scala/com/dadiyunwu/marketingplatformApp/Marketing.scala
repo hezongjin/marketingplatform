@@ -12,6 +12,9 @@ import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
+/**
+  * 标签计算 写入CK
+  */
 object Marketing {
 
   private val ent_id = "ent_id"
@@ -21,7 +24,6 @@ object Marketing {
     val conf = SparkHelper.getSparkConf(SparkConstants.name)
     //      .set("spark.sql.warehouse.dir", "spark-warehouse")
     val spark = SparkHelper.getSparkSession(conf)
-
 
     val sourceDF = spark.read.parquet("/ori/marketing")
       .where(col("entId").isNotNull)
@@ -69,11 +71,11 @@ object Marketing {
       .join(subDF, sourceDF(ent_id) === subDF(ent_id), SparkConstants.leftType)
       .select(
         sourceDF("*"),
-        when(treadMarkDF(ent_id).isNotNull, 1).otherwise(2).alias("t1"),
-        when(patentDF(ent_id).isNotNull, 1).otherwise(2).alias("t2"),
-        when(alterationsDF(ent_id).isNotNull, 1).otherwise(2).alias("t3"),
-        when(netPopuDF(ent_id).isNotNull, 1).otherwise(2).alias("t4"),
-        when(subDF(ent_id).isNotNull, 1).otherwise(2).alias("t5")
+        when(treadMarkDF(ent_id).isNotNull, 1).otherwise(0).alias("t1"),
+        when(patentDF(ent_id).isNotNull, 1).otherwise(0).alias("t2"),
+        when(alterationsDF(ent_id).isNotNull, 1).otherwise(0).alias("t3"),
+        when(netPopuDF(ent_id).isNotNull, 1).otherwise(0).alias("t4"),
+        when(subDF(ent_id).isNotNull, 1).otherwise(0).alias("t5")
       )
 
 
@@ -91,9 +93,32 @@ object Marketing {
 
 
     val baseInfoJoinColumns = ColumnHelper.getBaseInfoJoinColumns(labelWithCapitalDF)
-    val resultDF = labelWithCapitalDF.join(baseInfoDF, Seq(ent_id), SparkConstants.leftType)
+    val oldResultDF = labelWithCapitalDF.join(baseInfoDF, Seq(ent_id), SparkConstants.leftType)
       .select(baseInfoJoinColumns: _*)
-      .coalesce(20)
+
+    val oriDF = spark.read.parquet("/ori/marketing")
+
+    val resultDF = oriDF.join(oldResultDF, oriDF("custId") === oldResultDF("cust_id"), "left")
+      .select(
+        oriDF("custId").alias("cust_id"),
+        oriDF("createDate"),
+        oriDF("custNameCn"),
+        col("t1"),
+        col("t2"),
+        col("t3"),
+        col("t4"),
+        col("t5"),
+        col("t6"),
+        col("reg_caps2"),
+        col("estimate_date"),
+        col("cnei_code"),
+        col("cnei_sec_code"),
+        col("province_code"),
+        col("city_code"),
+        col("county_code")
+      )
+
+    //.coalesce(20)                 //OOM
 
 
     /*val resultSchema = ColumnHelper.getResultSchema()
@@ -135,7 +160,7 @@ object Marketing {
 
     resultDF.persist()
 
-    val today = LocalDate.now().toString
+    val today = LocalDate.now().plusDays(-1).toString
     val prop = SparkConstants.CLICKHOUSE_PROP
     val url = SparkConstants.CLICKHOUSE_URL()
     val table = SparkConstants.DATA_TABLE
@@ -145,7 +170,7 @@ object Marketing {
       val value = elem._2
       resultDF
         .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"),
-          when(col(key).equalTo(1), "有").otherwise("无").alias("TAG_VALUE_NAME")
+          when(col(key).equalTo(1), "有").when(col(key).equalTo("0"), "无").otherwise(null).alias("TAG_VALUE_NAME")
         )
         .withColumn("DATA_DATE", lit(today))
         //        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP1(key)))
@@ -162,7 +187,7 @@ object Marketing {
       val value = elem._2
       resultDF
         .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"),
-          when(col(key).equalTo(1), "是").otherwise("否").alias("TAG_VALUE_NAME")
+          when(col(key).equalTo(1), "是").when(col(key).equalTo(0), "否").otherwise(null).alias("TAG_VALUE_NAME")
         )
         .withColumn("DATA_DATE", lit(today))
         //        .withColumn("TAG_VALUE_NAME", lit(SparkConstants.TAG_VALUE_NAME_MAP1(key)))
@@ -205,7 +230,7 @@ object Marketing {
       val key = elem._1
       val value = elem._2
       resultDF
-        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE_NAME"))
+        .select(col("cust_id").alias("CUST_ID"), col(key).alias("TAG_VALUE"))
         .withColumn("DATA_DATE", lit(today))
         .withColumn("TAG_CODE", lit(SparkConstants.TAG_CODE_MAP(key)))
         .write
