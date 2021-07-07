@@ -1,12 +1,15 @@
 package com.dadiyunwu.marketingplatformApp
 
+import java.net.URI
 import java.time.LocalDate
 
 import com.dadiyunwu.comm.SparkConstants
-import com.dadiyunwu.util.{ColumnHelper, CommHelper, SparkHelper}
+import com.dadiyunwu.util.{ClickHouseHelper, ColumnHelper, CommHelper, SparkHelper}
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions._
 import org.apache.spark.SparkConf
-import org.apache.spark.sql.{Row, RowFactory, SaveMode}
+import org.apache.spark.sql.{Row, RowFactory, SaveMode, SparkSession}
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 import scala.collection.mutable
@@ -21,14 +24,40 @@ object Marketing {
 
   def main(args: Array[String]): Unit = {
 
+    //添加重跑逻辑 删除今天的数据
+    val connection = ClickHouseHelper.getCKConnection()
+    val sql = "alter table ODS_CE17_LOCAL.ce17_hbase_tag_cust_base on cluster ch_cluster delete where DATA_DATE=(today()-1)";
+    ClickHouseHelper.executeSql(connection, sql)
+    ClickHouseHelper.closeCKConnection(connection)
+    Thread.sleep(10 * 1000)
+
+
     val conf = SparkHelper.getSparkConf(SparkConstants.name)
     //      .set("spark.sql.warehouse.dir", "spark-warehouse")
     val spark = SparkHelper.getSparkSession(conf)
 
-    val sourceDF = spark.read.parquet("/ori/marketing")
-      .where(col("entId").isNotNull)
-      .selectExpr("entId as ent_id", "custId as cust_id", "createDate", "custNameCn")
-      .repartition(20)
+
+    init(spark)
+
+    val dimDF = spark.read.parquet("/ori/market_diminfo")
+    val entDF = spark.read.parquet("/ori/market_entinfo")
+
+    val sourceDF = dimDF.join(entDF, dimDF("CUST_ID") === entDF("custId"), "left")
+      .where(entDF("entId").isNotNull and entDF("custId").isNotNull)
+      .select(
+        dimDF("CUST_ID").alias("cust_id"),
+        entDF("entId").alias("ent_id"),
+        entDF("createTime").alias("createDate"),
+        entDF("custName").alias("custNameCn")
+      )
+      .repartition(200)
+
+    sourceDF.persist()
+
+    /*    val sourceDF = spark.read.parquet("/ori/marketing")
+          .where(col("entId").isNotNull)
+          .selectExpr("entId as ent_id", "custId as cust_id", "createDate", "custNameCn")
+          .repartition(20)*/
 
     val entId = ColumnHelper.getEntID()
 
@@ -96,11 +125,18 @@ object Marketing {
     val oldResultDF = labelWithCapitalDF.join(baseInfoDF, Seq(ent_id), SparkConstants.leftType)
       .select(baseInfoJoinColumns: _*)
 
-    val oriDF = spark.read.parquet("/ori/marketing")
-
-    val resultDF = oriDF.join(oldResultDF, oriDF("custId") === oldResultDF("cust_id"), "left")
+    //    val oriDF = spark.read.parquet("/ori/marketing")
+    val oriDF = dimDF.join(entDF, dimDF("CUST_ID") === entDF("custId"), "left")
       .select(
-        oriDF("custId").alias("cust_id"),
+        dimDF("CUST_ID").alias("cust_id"),
+        entDF("entId").alias("ent_id"),
+        entDF("createTime").alias("createDate"),
+        entDF("custName").alias("custNameCn")
+      )
+
+    val resultDF = oriDF.join(oldResultDF, oriDF("cust_id") === oldResultDF("cust_id"), "left")
+      .select(
+        oriDF("cust_id").alias("cust_id"),
         oriDF("createDate"),
         oriDF("custNameCn"),
         col("t1"),
@@ -158,6 +194,7 @@ object Marketing {
       arr.iterator
     })(resultEncoder)*/
 
+    sourceDF.unpersist()
     resultDF.persist()
 
     val today = LocalDate.now().plusDays(-1).toString
@@ -245,6 +282,29 @@ object Marketing {
 
     spark.sparkContext.stop()
     spark.stop()
+  }
+
+  def init(spark: SparkSession): Unit = {
+
+    val hadoopConf = new Configuration()
+    val fs = FileSystem.newInstance(new URI("hdfs://bdpcluster/"), hadoopConf)
+
+    if (fs.exists(new Path("/ori/market_diminfo"))) {
+      fs.delete(new Path("/ori/market_diminfo"), true)
+    }
+
+    if (fs.exists(new Path("/ori/market_entinfo"))) {
+      fs.delete(new Path("/ori/market_entinfo"), true)
+    }
+
+    if (null != fs) {
+      fs.close()
+    }
+
+    val dimDF = SparkHelper.getDIMTable(spark)
+    val entDF = SparkHelper.getEntTable(spark)
+    dimDF.write.parquet("/ori/market_diminfo")
+    entDF.write.parquet("/ori/market_entinfo")
   }
 
 }

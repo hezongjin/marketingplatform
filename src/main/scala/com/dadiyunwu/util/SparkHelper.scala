@@ -16,6 +16,8 @@ import scala.io.Source
 /**
   * spark 工具类
   */
+case class JDBCConstant(table: String, columnName: String = null, lowerBound: Long = 0, upperBound: Long = 4, numPartitions: Int = 4)
+
 object SparkHelper {
 
 
@@ -29,8 +31,8 @@ object SparkHelper {
       .set("hbase.client.scanner.caching", "100000")
       .set("spark.task.maxFailures", "8")
       .set("spark.shuffle.io.retryWait", "60s")
-      .set("spark.sql.shuffle.partitions", "400")
-      .set("spark.sql.warehouse.dir", "spark-warehouse")
+    //      .set("spark.sql.shuffle.partitions", "200")
+    //      .set("spark.sql.warehouse.dir", "spark-warehouse")
 
     conf
   }
@@ -120,11 +122,12 @@ object SparkHelper {
 
   def getFilePath(fileName: String): String = {
     var path: String = null
-    if (SparkConstants.tag.equals("prod")) {
-      path = s"hdfs://bdpcluster/ori/map/${fileName}"
-    } else {
-      path = SparkHelper.getClass.getClassLoader.getResource(fileName).getPath
-    }
+    path = s"hdfs://bdpcluster/ori/map/${fileName}"
+    /* if (SparkConstants.tag.equals("prod")) {
+       path = s"hdfs://bdpcluster/ori/map/${fileName}"
+     } else {
+       path = SparkHelper.getClass.getClassLoader.getResource(fileName).getPath
+     }*/
     path
   }
 
@@ -168,16 +171,96 @@ object SparkHelper {
   }
 
   /**
-    * 获取维表 -> 要计算的17万数据 (后续会增加)
     *
-    * @param sparkSession
+    * @param spark
+    * @param useConcurrent 是否多线程拉取 true是 false否
+    * @param jdbcConstant  拉取参数
     * @return
     */
-  //todo 获取维表 读取clickhouse 获取
-  def getDIMTable(sparkSession: SparkSession): DataFrame = {
+  def getTableFromJDBC(spark: SparkSession, useConcurrent: Boolean, jdbcConstant: JDBCConstant): DataFrame = {
 
-    null
+    val prop = new Properties()
+    prop.put("driver", classOf[ru.yandex.clickhouse.ClickHouseDriver].getName)
+    prop.put("user", SparkConstants.CLICKHOUSE_USER)
+    prop.put("password", SparkConstants.CLICKHOUSE_PASSWORD)
+    val url = SparkConstants.CLICKHOUSE_URL()
+
+    var jdbcTable: DataFrame = null
+    if (!useConcurrent) {
+      jdbcTable = spark.read.jdbc(
+        url,
+        jdbcConstant.table,
+        prop
+      )
+    } else {
+      jdbcTable = spark.read.jdbc(
+        url,
+        jdbcConstant.table,
+        jdbcConstant.columnName,
+        jdbcConstant.lowerBound,
+        jdbcConstant.upperBound,
+        jdbcConstant.numPartitions,
+        prop
+      )
+
+    }
+    jdbcTable
   }
 
+  def getDIMTable(spark: SparkSession): DataFrame = {
+    val jdbcConstant = JDBCConstant("DIM.DIM_CE17_CUST")
+    val DIMTable = SparkHelper.getTableFromJDBC(spark, false, jdbcConstant)
+      .selectExpr("cust_id")
+    DIMTable
+  }
+
+  def getEntTable(spark: SparkSession): DataFrame = {
+
+    val sql =
+      """
+        |(
+        |select
+        |	custId ,
+        |	entId ,
+        |	createTime ,
+        |	custName,
+        |	abs(javaHash(custId))%4 as hashID
+        |from
+        |	(
+        |	select
+        |		custId ,
+        |		entId,
+        |		createTime ,
+        |		custName,
+        |		updateTime
+        |	from
+        |		ODS_CE17.moncma_cm_cust_entid_rel mccer
+        |	where
+        |		entId != ''
+        |		and entId is not null )
+        |order by
+        |	updateTime
+        |limit 1 by custId
+        |) tmp
+      """.stripMargin
+
+    val constant = JDBCConstant(sql, "hashID")
+    val entTable = this.getTableFromJDBC(spark, true, constant)
+
+    entTable
+  }
+
+  def main(args: Array[String]): Unit = {
+    val conf = new SparkConf().setAppName("as").setMaster("local[9]")
+      .set("spark.sql.warehouse.dir", "E:/learn/marketingplatform/spark-warehouse")
+    val spark = SparkSession.builder().config(conf).getOrCreate()
+    spark.sparkContext.setLogLevel("WARN")
+
+    val df = this.getEntTable(spark)
+    df.show()
+
+    spark.stop()
+
+  }
 
 }

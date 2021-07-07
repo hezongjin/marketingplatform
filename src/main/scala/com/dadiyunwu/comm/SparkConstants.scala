@@ -15,8 +15,8 @@ object SparkConstants {
   //================================spark参数=====================================
   //  val master = "yarn"
   val master = if (tag.equals("test")) {
-    "local[*]"
-    //    "yarn"
+    //    "local[*]"
+    "yarn"
   } else {
     "yarn"
   }
@@ -130,12 +130,13 @@ object SparkConstants {
 
   val CLICKHOUSE_DERIVER = classOf[ru.yandex.clickhouse.ClickHouseDriver].getName
   val CLICKHOUSE_USER = "default"
+
   val CLICKHOUSE_PASSWORD = if (tag.equals("prod")) {
     "FqB4Ml6T"
   } else if (tag.equals("test")) {
     "c6hP16Fd"
   } else {
-    null
+    ""
   }
 
   val CLICKHOUSE_PROP = {
